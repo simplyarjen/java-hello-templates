@@ -9,7 +9,7 @@ public class App {
             hello = Hello | Hi | Greetings
             world = World | Everybody | Java""";
 
-        var parsed = Template.parse(src);
+        var parsed = Parser.parse(src);
 
         var message = parsed.get("message");
 
