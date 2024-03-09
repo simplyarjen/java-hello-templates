@@ -4,14 +4,16 @@ import java.util.*;
 
 public class App {
     public static void main(String[] args) {
+        var parser = new Parser();
+
         var src = """
             message = (hello), (world)!
             hello = Hello | Hi | Greetings
             world = World | Everybody | Java""";
 
-        var parsed = Parser.parse(src);
+        parser.parse(src);
 
-        var message = parsed.get("message");
+        var message = parser.getTemplate("message");
 
         var r = new Random();
         for (int i = 0; i < 10; i++)

@@ -15,9 +15,9 @@ public class Parser {
         }
     }
     
-    public static Map<String, Template> parse(String source) {
-        var result = new HashMap<String, Template>();
+    private final Map<String, Template> templates = new HashMap<>();
 
+    public void parse(String source) {
         source.lines().forEach(line -> {
             var parts = line.split(" *= *", 2);
             if (parts.length < 2) {
@@ -44,8 +44,8 @@ public class Parser {
                     else if (c == ')') {
                         if (literal) throw new IllegalArgumentException("Invalid template: " + choices[i]);
                         var reference = fragment.toString();
-                        result.putIfAbsent(reference, new TemplateReference());
-                        fragmentTemplates.add(result.get(reference));
+                        templates.putIfAbsent(reference, new TemplateReference());
+                        fragmentTemplates.add(templates.get(reference));
                         fragment.setLength(0);
                         literal = true;
                     }
@@ -62,24 +62,27 @@ public class Parser {
 
             var template = choices.length == 1 ? choiceTemplates[0] : Template.choose(choiceTemplates);
 
-            if (!result.containsKey(name)) {
-                result.put(name, template);
+            if (!templates.containsKey(name)) {
+                templates.put(name, template);
             }
-            else if (TemplateReference.isUnresolved(result.get(name))) {
-                ((TemplateReference) result.get(name)).resolve(template);
+            else if (TemplateReference.isUnresolved(templates.get(name))) {
+                ((TemplateReference) templates.get(name)).resolve(template);
             }
             else {
                 throw new IllegalArgumentException("Duplicate template definition for: " + name);
             }
         });
 
-        var unresolved = result.entrySet().stream()
+        var unresolved = templates.entrySet().stream()
             .filter(e -> TemplateReference.isUnresolved(e.getValue()))
             .map(Map.Entry::getKey)
             .toList();
         if (!unresolved.isEmpty()) {
             throw new IllegalArgumentException("Unresolved templates: " + unresolved);
         }
-        return result;
+    }
+
+    public Template getTemplate(String name) {
+        return templates.get(name);
     }
 }
