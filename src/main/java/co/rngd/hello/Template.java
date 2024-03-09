@@ -8,10 +8,14 @@ import java.util.Map;
 import java.util.Random;
 
 public interface Template {
-     String generate(Random random);
+    StringBuilder generate(StringBuilder builder, Random random);
+    
+    default String generate(Random random) {
+        return generate(new StringBuilder(), random).toString(); 
+    }
     
     static Template choose(Template... options) {
-        return r -> options[r.nextInt(options.length)].generate(r);
+        return (builder, random) -> options[random.nextInt(options.length)].generate(builder, random);
     }
 
     static Template join(Template... fragments) {
@@ -20,25 +24,23 @@ public interface Template {
 
     static Template join(Collection<Template> fragments) {
     
-        return r -> { 
-            var result = new StringBuilder();
-            fragments.forEach(fragment -> 
-                result.append(fragment.generate(r)));
-            return result.toString();
+        return (builder, random) -> { 
+            fragments.forEach(fragment -> fragment.generate(builder, random));
+            return builder;
         };
     }
 
     static Template literal(String value) {
-        return r -> value;
+        return (builder, random) -> builder.append(value);
     }
 
-    static Map<String, Template> parse(String source) {
-        class Thunk implements Template {
+    public static Map<String, Template> parse(String source) {
+        class TemplateReference implements Template {
             private Template resolved;
-            public String generate(Random r) { return resolved.generate(r); }
+            public StringBuilder generate(StringBuilder builder, Random random) { return resolved.generate(builder, random); }
             private void resolve(Template t) { this.resolved = t; }
             static boolean isUnresolved(Template t) {
-                return (t instanceof Thunk && ((Thunk) t).resolved == null);
+                return (t instanceof TemplateReference && ((TemplateReference) t).resolved == null);
             }
         }
         
@@ -70,7 +72,7 @@ public interface Template {
                     else if (c == ')') {
                         if (literal) throw new IllegalArgumentException("Invalid template: " + choices[i]);
                         var reference = fragment.toString();
-                        result.putIfAbsent(reference, new Thunk());
+                        result.putIfAbsent(reference, new TemplateReference());
                         fragmentTemplates.add(result.get(reference));
                         fragment.setLength(0);
                         literal = true;
@@ -91,8 +93,8 @@ public interface Template {
             if (!result.containsKey(name)) {
                 result.put(name, template);
             }
-            else if (Thunk.isUnresolved(result.get(name))) {
-                ((Thunk) result.get(name)).resolve(template);
+            else if (TemplateReference.isUnresolved(result.get(name))) {
+                ((TemplateReference) result.get(name)).resolve(template);
             }
             else {
                 throw new IllegalArgumentException("Duplicate template definition for: " + name);
@@ -100,7 +102,7 @@ public interface Template {
         });
 
         var unresolved = result.entrySet().stream()
-            .filter(e -> Thunk.isUnresolved(e.getValue()))
+            .filter(e -> TemplateReference.isUnresolved(e.getValue()))
             .map(Map.Entry::getKey)
             .toList();
         if (!unresolved.isEmpty()) {
